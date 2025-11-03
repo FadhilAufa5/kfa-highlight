@@ -1,8 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
-import { Link, router } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { FileText, Plus, Trash2, Edit, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 interface Upload {
     id: number;
@@ -19,9 +21,31 @@ interface Upload {
 }
 
 export default function UploadIndex({ uploads }: { uploads: Upload[] }) {
-    const handleDelete = (id: number) => {
-        if (confirm('Are you sure you want to delete this PDF?')) {
-            router.delete(`/uploads/${id}`);
+    const { props } = usePage();
+
+    useEffect(() => {
+        if (props.flash?.success) {
+            toast.success(props.flash.success as string);
+        }
+        if (props.flash?.error) {
+            toast.error(props.flash.error as string);
+        }
+    }, [props.flash]);
+
+    const handleDelete = (id: number, title: string) => {
+        if (confirm(`Are you sure you want to delete "${title}"?`)) {
+            router.delete(`/uploads/${id}`, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success('PDF deleted successfully!');
+                },
+                onError: (errors) => {
+                    const errorMessages = Object.values(errors).flat();
+                    errorMessages.forEach((error) => {
+                        toast.error(error as string);
+                    });
+                },
+            });
         }
     };
 
@@ -71,7 +95,9 @@ export default function UploadIndex({ uploads }: { uploads: Upload[] }) {
                                         <Button
                                             variant="secondary"
                                             size="sm"
-                                            onClick={() => handleDelete(upload.id)}
+                                            onClick={() =>
+                                                handleDelete(upload.id, upload.title)
+                                            }
                                             className="h-8 w-8 rounded-full p-0 shadow-lg hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30"
                                         >
                                             <Trash2 className="h-4 w-4" />

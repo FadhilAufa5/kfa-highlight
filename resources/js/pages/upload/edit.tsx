@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
+import { toast } from 'sonner';
 
 interface Upload {
     id: number;
@@ -24,7 +25,17 @@ export default function UploadEdit({ upload }: { upload: Upload }) {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        put(`/uploads/${upload.id}`);
+        put(`/uploads/${upload.id}`, {
+            onSuccess: () => {
+                toast.success('PDF updated successfully!');
+            },
+            onError: (errors) => {
+                const errorMessages = Object.values(errors).flat();
+                errorMessages.forEach((error) => {
+                    toast.error(error as string);
+                });
+            },
+        });
     };
 
     return (

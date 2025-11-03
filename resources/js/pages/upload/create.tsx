@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
+import { toast } from 'sonner';
 
 export default function UploadCreate() {
     const { data, setData, post, processing, errors } = useForm({
@@ -14,7 +15,17 @@ export default function UploadCreate() {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post('/uploads');
+        post('/uploads', {
+            onSuccess: () => {
+                toast.success('PDF uploaded successfully!');
+            },
+            onError: (errors) => {
+                const errorMessages = Object.values(errors).flat();
+                errorMessages.forEach((error) => {
+                    toast.error(error as string);
+                });
+            },
+        });
     };
 
     return (

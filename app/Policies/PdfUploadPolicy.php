@@ -13,7 +13,7 @@ class PdfUploadPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -21,7 +21,7 @@ class PdfUploadPolicy
      */
     public function view(User $user, PdfUpload $pdfUpload): bool
     {
-        return false;
+        return $user->id === $pdfUpload->user_id;
     }
 
     /**
@@ -29,7 +29,7 @@ class PdfUploadPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return true;
     }
 
     /**

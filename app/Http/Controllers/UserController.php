@@ -33,22 +33,23 @@ class UserController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
-            'is_active' => $validated['is_active'] ?? true,
-        ]);
+        try {
+            User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+                'is_active' => $validated['is_active'] ?? true,
+            ]);
 
-        return redirect()->route('users.index')
-            ->with('success', 'User created successfully!');
-    }
-
-    public function edit(User $user): Response
-    {
-        return Inertia::render('users/edit', [
-            'user' => $user,
-        ]);
+            return redirect()->route('users.index')
+                ->with('success', 'User created successfully!');
+        } catch (\Exception $e) {
+            \Log::error('User creation failed: ' . $e->getMessage());
+            
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to create user: ' . $e->getMessage()]);
+        }
     }
 
     public function update(Request $request, User $user)
@@ -60,26 +61,46 @@ class UserController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        $user->update([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'password' => $validated['password'] ? Hash::make($validated['password']) : $user->password,
-            'is_active' => $validated['is_active'] ?? $user->is_active,
-        ]);
+        try {
+            $updateData = [
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'is_active' => $validated['is_active'] ?? $user->is_active,
+            ];
 
-        return redirect()->route('users.index')
-            ->with('success', 'User updated successfully!');
+            if (!empty($validated['password'])) {
+                $updateData['password'] = Hash::make($validated['password']);
+            }
+
+            $user->update($updateData);
+
+            return redirect()->route('users.index')
+                ->with('success', 'User updated successfully!');
+        } catch (\Exception $e) {
+            \Log::error('User update failed: ' . $e->getMessage());
+            
+            return redirect()->back()
+                ->withErrors(['error' => 'Failed to update user: ' . $e->getMessage()]);
+        }
     }
 
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {
-            return back()->with('error', 'You cannot delete your own account!');
+            return redirect()->back()
+                ->withErrors(['error' => 'You cannot delete your own account!']);
         }
 
-        $user->delete();
+        try {
+            $user->delete();
 
-        return redirect()->route('users.index')
-            ->with('success', 'User deleted successfully!');
+            return redirect()->route('users.index')
+                ->with('success', 'User deleted successfully!');
+        } catch (\Exception $e) {
+            \Log::error('User deletion failed: ' . $e->getMessage());
+            
+            return redirect()->back()
+                ->withErrors(['error' => 'Failed to delete user: ' . $e->getMessage()]);
+        }
     }
 }
