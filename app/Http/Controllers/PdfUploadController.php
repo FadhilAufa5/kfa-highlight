@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Imagick;
 
 class PdfUploadController extends Controller
 {
@@ -47,45 +48,13 @@ class PdfUploadController extends Controller
             
             $fullPdfPath = storage_path('app/public/' . $pdfPath);
 
-            $imagePath = null;
-            $conversionMessage = '';
-
-            // ✅ Pastikan folder pdf-images aman
-            $this->ensureDirectoryExists('pdf-images');
+            $imagePath = $this->convertPdfToImage($pdfPath);
             
-            if (extension_loaded('imagick')) {
-                try {
-                    if (!file_exists($fullPdfPath)) {
-                        throw new \Exception('PDF file not found after upload');
-                    }
-
-                    $imagick = new \Imagick();
-                    $imagick->setResolution(150, 150);
-                    $imagick->readImage($fullPdfPath . '[0]');
-                    
-                    $imagick->setImageFormat('jpg');
-                    $imagick->setImageCompressionQuality(90);
-                    $imagick->setImageBackgroundColor('white');
-                    $imagick = $imagick->flattenImages();
-                    
-                    $imageFilename = pathinfo($pdfPath, PATHINFO_FILENAME) . '.jpg';
-                    $imagePath = 'pdf-images/' . $imageFilename;
-
-                    Storage::disk('public')->put($imagePath, $imagick->getImageBlob());
-                    
-                    $imagick->clear();
-                    $imagick->destroy();
-                    
-                    $conversionMessage = ' Image preview generated successfully.';
-                } catch (\Exception $e) {
-                    \Log::error('PDF to Image conversion failed: ' . $e->getMessage());
-                    $imagePath = $this->generatePlaceholderImage($pdfPath);
-                    $conversionMessage = ' Note: Using placeholder image (Imagick error: ' . $e->getMessage() . ')';
-                }
-            } else {
-                \Log::warning('Imagick extension not loaded - using placeholder');
+            if (!$imagePath) {
                 $imagePath = $this->generatePlaceholderImage($pdfPath);
-                $conversionMessage = ' Note: Using placeholder image (Install Imagick for PDF preview)';
+                $conversionMessage = ' Note: Using placeholder image (Imagick extension not available or conversion failed)';
+            } else {
+                $conversionMessage = ' PDF converted to image successfully.';
             }
 
             PdfUpload::where('user_id', auth()->id())
@@ -175,16 +144,79 @@ class PdfUploadController extends Controller
         }
     }
 
-    private function generatePlaceholderImage($pdfPath)
+    private function convertPdfToImage(string $pdfPath): ?string
     {
         try {
-            // ✅ Pastikan folder aman
+            $this->ensureDirectoryExists('pdf-images');
+            
+            if (!extension_loaded('imagick')) {
+                \Log::warning('Imagick extension not loaded');
+                return null;
+            }
+
+            if (!class_exists('Imagick')) {
+                \Log::warning('Imagick class not available');
+                return null;
+            }
+
+            $fullPdfPath = storage_path('app/public/' . $pdfPath);
+            
+            if (!file_exists($fullPdfPath)) {
+                throw new \Exception('PDF file not found at: ' . $fullPdfPath);
+            }
+
+            $imageFilename = pathinfo($pdfPath, PATHINFO_FILENAME) . '.jpg';
+            $imagePath = 'pdf-images/' . $imageFilename;
+            $fullImagePath = storage_path('app/public/' . $imagePath);
+
+            $imagick = new Imagick();
+            
+            $imagick->setResolution(150, 150);
+            
+            $imagick->readImage($fullPdfPath . '[0]');
+            
+            $imagick->setImageFormat('jpeg');
+            
+            $imagick->setImageCompressionQuality(90);
+            
+            $imagick = $imagick->mergeImageLayers(Imagick::LAYERMETHOD_FLATTEN);
+            $imagick->setImageBackgroundColor('white');
+            $imagick->setImageAlphaChannel(Imagick::ALPHACHANNEL_REMOVE);
+            
+            $success = $imagick->writeImage($fullImagePath);
+            
+            $imagick->clear();
+            $imagick->destroy();
+
+            if (!$success || !file_exists($fullImagePath)) {
+                throw new \Exception('Failed to write image file');
+            }
+
+            \Log::info('PDF converted successfully: ' . $imagePath);
+            return $imagePath;
+            
+        } catch (\ImagickException $e) {
+            \Log::error('Imagick error: ' . $e->getMessage());
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('PDF to Image conversion failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    private function generatePlaceholderImage($pdfPath): ?string
+    {
+        try {
             $this->ensureDirectoryExists('pdf-images');
 
             $width = 1200;
             $height = 900;
             
             $image = imagecreatetruecolor($width, $height);
+            
+            if ($image === false) {
+                throw new \Exception('Failed to create image resource');
+            }
             
             $bgColor = imagecolorallocate($image, 243, 244, 246);
             $textColor = imagecolorallocate($image, 75, 85, 99);
@@ -198,10 +230,10 @@ class PdfUploadController extends Controller
             
             imagefilledrectangle(
                 $image, 
-                $centerX - $iconSize/2, 
-                $centerY - $iconSize, 
-                $centerX + $iconSize/2, 
-                $centerY + $iconSize/2,
+                (int)($centerX - $iconSize/2), 
+                (int)($centerY - $iconSize), 
+                (int)($centerX + $iconSize/2), 
+                (int)($centerY + $iconSize/2),
                 $iconColor
             );
             
@@ -210,12 +242,16 @@ class PdfUploadController extends Controller
             $font = 5;
             $textWidth = imagefontwidth($font) * strlen($text);
             
-            imagestring($image, $font, ($width - $textWidth) / 2, $centerY + $iconSize, $text, $textColor);
+            imagestring($image, $font, (int)(($width - $textWidth) / 2), (int)($centerY + $iconSize), $text, $textColor);
             
             ob_start();
             imagejpeg($image, null, 90);
             $imageData = ob_get_clean();
             imagedestroy($image);
+            
+            if ($imageData === false || empty($imageData)) {
+                throw new \Exception('Failed to generate image data');
+            }
             
             $imageFilename = $filename . '.jpg';
             $imagePath = 'pdf-images/' . $imageFilename;

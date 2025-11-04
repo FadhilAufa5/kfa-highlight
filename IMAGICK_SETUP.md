@@ -12,7 +12,7 @@ php -v
 2. **Download Imagick DLL:**
 - Kunjungi: https://windows.php.net/downloads/pecl/releases/imagick/
 - Download versi yang sesuai dengan PHP version Anda (misalnya: php_imagick-3.7.0-8.2-ts-vs16-x64.zip)
-- Pilih:
+- Pilih:  
   - `ts` jika Thread Safe
   - `nts` jika Non Thread Safe  
   - `x64` untuk 64-bit
