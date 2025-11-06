@@ -15,10 +15,12 @@ class PdfUpload extends Model
         'image_path',
         'order',
         'is_active',
+        'conversion_status',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'image_path' => 'array',
     ];
 
     public function user(): BelongsTo

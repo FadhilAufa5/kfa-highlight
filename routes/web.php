@@ -12,7 +12,16 @@ Route::get('/', function () {
         ->where('is_active', true)
         ->orderBy('order')
         ->orderBy('created_at', 'desc')
-        ->get();
+        ->get()
+        ->map(function ($upload) {
+            return [
+                'id' => $upload->id,
+                'title' => $upload->title,
+                'image_path' => $upload->image_path,
+                'pdf_path' => $upload->pdf_path,
+                'conversion_status' => $upload->conversion_status ?? 'pending',
+            ];
+        });
 
     return Inertia::render('welcome', [
         'canRegister' => Features::enabled(Features::registration()),

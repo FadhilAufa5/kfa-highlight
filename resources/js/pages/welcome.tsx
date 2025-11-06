@@ -7,8 +7,9 @@ import { ChevronLeft, ChevronRight, FileText, Sparkles } from 'lucide-react';
 interface Upload {
     id: number;
     title: string;
-    image_path: string | null;
+    image_path: string[] | null;
     pdf_path: string;
+    conversion_status: 'pending' | 'processing' | 'completed' | 'failed';
 }
 
 export default function Welcome({
@@ -119,11 +120,29 @@ export default function Welcome({
                                                     : 'opacity-0 scale-105'
                                             }`}
                                         >
-                                            {upload.image_path ? (
+                                            {upload.conversion_status === 'pending' || upload.conversion_status === 'processing' ? (
+                                                <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
+                                                    <div className="text-center">
+                                                        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600"></div>
+                                                        <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                                            {upload.conversion_status === 'pending' ? 'Conversion pending...' : 'Converting PDF...'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : upload.conversion_status === 'failed' ? (
+                                                <div className="flex h-full items-center justify-center bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900">
+                                                    <div className="text-center">
+                                                        <FileText className="mx-auto mb-3 h-16 w-16 text-red-400 dark:text-red-600" />
+                                                        <p className="text-sm text-red-600 dark:text-red-400">
+                                                            Conversion failed
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ) : upload.image_path && upload.image_path.length > 0 ? (
                                                 <img
-                                                    src={`/storage/${upload.image_path}`}
+                                                    src={`/storage/${upload.image_path[0]}`}
                                                     alt={upload.title}
-                                                    className="h-full w-full object-cover"
+                                                    className="h-full w-full object-contain bg-slate-900"
                                                 />
                                             ) : (
                                                 <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900">
@@ -135,23 +154,6 @@ export default function Welcome({
                                                     </div>
                                                 </div>
                                             )}
-                                            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent"></div>
-                                            <div className="absolute inset-x-0 bottom-0 p-8">
-                                                <div className="mx-auto max-w-4xl">
-                                                    <h2 className="mb-3 text-3xl font-bold text-white drop-shadow-lg">
-                                                        {upload.title}
-                                                    </h2>
-                                                    <a
-                                                        href={`/storage/${upload.pdf_path}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="group/button inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-xl transition-all hover:scale-105 hover:shadow-2xl"
-                                                    >
-                                                        <FileText className="h-4 w-4 transition-transform group-hover/button:rotate-12" />
-                                                        <span>View Document</span>
-                                                    </a>
-                                                </div>
-                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -171,7 +173,7 @@ export default function Welcome({
                                             <ChevronRight className="h-6 w-6 text-slate-900 dark:text-white" />
                                         </button>
 
-                                        <div className="absolute inset-x-0 bottom-24 flex justify-center gap-2">
+                                        <div className="absolute inset-x-0 bottom-6 flex justify-center gap-2">
                                             {uploads.map((_, index) => (
                                                 <button
                                                     key={index}
