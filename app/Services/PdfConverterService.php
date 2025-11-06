@@ -175,51 +175,85 @@ class PdfConverterService
     private function configureGhostscript(): void
     {
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            $possiblePaths = [
-                'C:\\Program Files\\gs\\gs10.04.0\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.03.1\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.03.0\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.02.1\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.02.0\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.01.2\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.01.1\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.01.0\\bin\\gswin64c.exe',
-                'C:\\Program Files\\gs\\gs10.00.0\\bin\\gswin64c.exe',
-                'C:\\Program Files (x86)\\gs\\gs10.04.0\\bin\\gswin32c.exe',
-                'C:\\Program Files (x86)\\gs\\gs10.03.1\\bin\\gswin32c.exe',
-                'C:\\Program Files (x86)\\gs\\gs10.03.0\\bin\\gswin32c.exe',
+            $gsBinPaths = [
+                'C:\\Program Files\\gs\\gs10.06.0\\bin',
+                'C:\\Program Files\\gs\\gs10.05.0\\bin',
+                'C:\\Program Files\\gs\\gs10.04.0\\bin',
+                'C:\\Program Files\\gs\\gs10.03.1\\bin',
+                'C:\\Program Files\\gs\\gs10.03.0\\bin',
+                'C:\\Program Files\\gs\\gs10.02.1\\bin',
+                'C:\\Program Files\\gs\\gs10.02.0\\bin',
+                'C:\\Program Files\\gs\\gs10.01.2\\bin',
+                'C:\\Program Files\\gs\\gs10.01.1\\bin',
+                'C:\\Program Files\\gs\\gs10.01.0\\bin',
+                'C:\\Program Files\\gs\\gs10.00.0\\bin',
+                'C:\\Program Files (x86)\\gs\\gs10.06.0\\bin',
+                'C:\\Program Files (x86)\\gs\\gs10.05.0\\bin',
+                'C:\\Program Files (x86)\\gs\\gs10.04.0\\bin',
+                'C:\\Program Files (x86)\\gs\\gs10.03.1\\bin',
+                'C:\\Program Files (x86)\\gs\\gs10.03.0\\bin',
             ];
 
-            $gsPath = null;
-            foreach ($possiblePaths as $path) {
-                if (file_exists($path)) {
-                    $gsPath = $path;
-                    break;
+            $foundBinPath = null;
+            foreach ($gsBinPaths as $binPath) {
+                if (is_dir($binPath)) {
+                    $gswin64c = $binPath . '\\gswin64c.exe';
+                    $gswin32c = $binPath . '\\gswin32c.exe';
+                    
+                    if (file_exists($gswin64c)) {
+                        $foundBinPath = $binPath;
+                        $gsExecutable = $gswin64c;
+                        break;
+                    } elseif (file_exists($gswin32c)) {
+                        $foundBinPath = $binPath;
+                        $gsExecutable = $gswin32c;
+                        break;
+                    }
                 }
             }
 
-            if ($gsPath) {
-                putenv("MAGICK_GHOSTSCRIPT_PATH={$gsPath}");
-                Log::info("Ghostscript configured: {$gsPath}");
-            } else {
+            if (!$foundBinPath) {
                 $dirs = glob('C:\\Program Files\\gs\\*', GLOB_ONLYDIR);
                 if (!empty($dirs)) {
                     $latestVersion = end($dirs);
-                    $gswin64 = $latestVersion . '\\bin\\gswin64c.exe';
-                    $gswin32 = $latestVersion . '\\bin\\gswin32c.exe';
+                    $binPath = $latestVersion . '\\bin';
                     
-                    if (file_exists($gswin64)) {
-                        putenv("MAGICK_GHOSTSCRIPT_PATH={$gswin64}");
-                        Log::info("Ghostscript auto-detected: {$gswin64}");
-                    } elseif (file_exists($gswin32)) {
-                        putenv("MAGICK_GHOSTSCRIPT_PATH={$gswin32}");
-                        Log::info("Ghostscript auto-detected: {$gswin32}");
-                    } else {
-                        Log::warning('Ghostscript not found. PDF conversion may fail.');
+                    if (is_dir($binPath)) {
+                        $gswin64c = $binPath . '\\gswin64c.exe';
+                        $gswin32c = $binPath . '\\gswin32c.exe';
+                        
+                        if (file_exists($gswin64c)) {
+                            $foundBinPath = $binPath;
+                            $gsExecutable = $gswin64c;
+                        } elseif (file_exists($gswin32c)) {
+                            $foundBinPath = $binPath;
+                            $gsExecutable = $gswin32c;
+                        }
                     }
-                } else {
-                    Log::warning('Ghostscript not installed in default location.');
                 }
+            }
+
+            if ($foundBinPath && isset($gsExecutable)) {
+                putenv("MAGICK_GHOSTSCRIPT_PATH={$gsExecutable}");
+                putenv("PATH=" . getenv("PATH") . ";{$foundBinPath}");
+                
+                $gsAlias = $foundBinPath . '\\gs.exe';
+                if (!file_exists($gsAlias)) {
+                    try {
+                        @copy($gsExecutable, $gsAlias);
+                        if (file_exists($gsAlias)) {
+                            Log::info("Created gs.exe alias: {$gsAlias}");
+                        }
+                    } catch (\Exception $e) {
+                        Log::warning("Could not create gs.exe alias (requires admin): " . $e->getMessage());
+                    }
+                }
+                
+                Log::info("Ghostscript configured: {$gsExecutable}");
+                Log::info("Ghostscript bin added to PATH: {$foundBinPath}");
+            } else {
+                Log::warning('Ghostscript not found. PDF conversion may fail.');
+                Log::warning('Please install Ghostscript from: https://www.ghostscript.com/');
             }
         }
     }
